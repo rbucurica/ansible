@@ -10,3 +10,15 @@ ansible all -m apt -a name=vim-nox --become --ask-become-pass
 # Update an installed package
 ansible all -m apt -a "name=snapd state=latest" --become --ask-become-pass
 
+# list tags
+ansible-playbook --list-tags <playbook.yml>
+
+# run plays on specific hosts using tags
+
+ansible-playbook --tags ubuntu --ask-become-pass <playbook.yml>
+
+# using multiple tags
+
+ansible-playbook --tags "ubuntu,centos" --ask-become-pass <playbook.yml>
+
+# https://docs.ansible.com/ansible/latest/reference_appendices/playbooks_keywords.html#task
