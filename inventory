@@ -1,3 +1,6 @@
-cloud_user@236d309b3a1d.mylabserver.com
-cloud_user@236d309b3a2d.mylabserver.com
-cloud_user@236d309b3a3d.mylabserver.com
+[ubuntu]
+cloud_user@236d309b3a1d.mylabserver.com apache_package=apache2 php_package=libapache2-mod-php
+cloud_user@236d309b3a2d.mylabserver.com apache_package=apache2 php_package=libapache2-mod-php
+
+[centos]
+cloud_user@236d309b3a3c.mylabserver.com apache_package=httpd php_package=php
