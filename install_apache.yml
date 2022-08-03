@@ -12,6 +12,22 @@
       state: latest
       update_cache: yes
 
+  - name: change e-mail address for admin
+    tags: ubuntu
+    lineinfile:
+      path: /etc/apache2/apache2.conf
+      regexp: '^Timeout'
+      line: Timeout 350
+    when: ansible_distribution == "Ubuntu"
+    register: apache2_config_change
+
+  - name: restart apache2
+    service:
+      name: apache2
+      state: restarted
+    when: apache2_config_change.changed
+
+
   - name: copy default html file to site
     tags: ubuntu
     copy:
@@ -20,6 +36,14 @@
       owner: root
       group: root
       mode: 0644
+  
+  - name: start httpd (CentOS)
+    tags: apache,centos,httpd
+    service:
+      name: httpd
+      state: started
+      enabled: yes
+    when: ansible_distribution == "CentOS"
 
 
 
