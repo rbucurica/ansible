@@ -1,6 +1,6 @@
 ---
 
-- hosts: kafka2
+- hosts: kafka1
   become: true
   tasks:
 
@@ -8,6 +8,17 @@
     package:
       name: java-1.8.0-openjdk
       state: present
+  
+  - name: Install firewalld
+    package:
+      name: firewalld
+      state: present
+
+  - name: Start and enable firewalld
+    systemd:
+      name: firewalld
+      state: started
+      enabled: yes
 
   - name: Edit /etc/profile
     blockinfile:
@@ -32,6 +43,158 @@
       gpgkey: https://packages.confluent.io/rpm/7.2/archive.key
       enabled: yes
 
+  - name: Install Confluent Community
+    package:
+      name: confluent-community-2.13
+      state: present
 
+  - name: Edit /etc/hosts
+    copy:
+      dest: /etc/hosts
+      content: |
+        172.31.18.178 236d309b3a1c.mylabserver.com zoo1
+        172.31.27.121 236d309b3a2c.mylabserver.com zoo2
+        172.31.19.242 236d309b3a3c.mylabserver.com zoo3
+
+  - name: Edit /etc/kafka/zookeeper.properties
+    blockinfile:
+      path: /etc/kafka/zookeeper.properties
+      block: |
+        tickTime=2000
+        initLimit=5
+        syncLimit=2
+        server.1=zoo1:2888:3888
+        server.2=zoo2:2888:3888
+        server.3=zoo3:2888:3888
+        autopurge.snapRetainCount=3
+        autopurge.purgeInterval=24
+
+  - name: Open port 2181
+    firewalld:
+      port: 2181/tcp
+      permanent: yes
+      immediate: yes
+      state: enabled
   
+  - name: Open port 2888
+    firewalld:
+      port: 2888/tcp
+      permanent: yes
+      immediate: yes
+      state: enabled
   
+  - name: Open port 3888
+    firewalld:
+      port: 3888/tcp
+      permanent: yes
+      immediate: yes
+      state: enabled
+
+  - name: Open port 9092
+    firewalld:
+      port: 9092/tcp
+      permanent: yes
+      immediate: yes
+      state: enabled
+  
+  - name: zookeper ID file 1
+    copy:
+      dest: /var/lib/zookeeper/myid
+      content: 1
+    when: ansible_nodename == "236d309b3a1c.mylabserver.com"
+
+  - name: zookeper ID file 2
+    copy:
+      dest: /var/lib/zookeeper/myid
+      content: 2
+    when: ansible_nodename == "236d309b3a2c.mylabserver.com"
+  
+  - name: zookeper ID file 3
+    copy:
+      dest: /var/lib/zookeeper/myid
+      content: 3
+    when: ansible_nodename == "236d309b3a3c.mylabserver.com"
+
+  - name: Edit broker ID 1
+    lineinfile:
+      path: /etc/kafka/server.properties
+      regexp: '^broker.id'
+      line: broker.id=1
+    when: ansible_nodename == "236d309b3a1c.mylabserver.com"
+
+  - name: Edit broker ID 2
+    lineinfile:
+      path: /etc/kafka/server.properties
+      regexp: '^broker.id'
+      line: broker.id=2
+    when: ansible_nodename == "236d309b3a2c.mylabserver.com"
+
+  - name: Edit broker ID 3
+    lineinfile:
+      path: /etc/kafka/server.properties
+      regexp: '^broker.id'
+      line: broker.id=3
+    when: ansible_nodename == "236d309b3a3c.mylabserver.com"
+
+  - name: Edit zookeeper connect
+    lineinfile:
+      path: /etc/kafka/server.properties
+      regexp: '^zookeeper.connect.+'
+      line: zookeeper.connect=zoo1:2181
+
+  - name: Edit listeners in kafka server properties in kafka1
+    lineinfile:
+      path: /etc/kafka/server.properties
+      regexp: '^#listeners=PLAINTEXT://:9092'
+      line: listeners=PLAINTEXT://236d309b3a1c.mylabserver.com:9092
+    when: ansible_nodename == "236d309b3a1c.mylabserver.com"
+
+  - name: Edit listeners in kafka server properties in kafka2
+    lineinfile:
+      path: /etc/kafka/server.properties
+      regexp: '^#listeners=PLAINTEXT://:9092'
+      line: listeners=PLAINTEXT://236d309b3a2c.mylabserver.com:9092
+    when: ansible_nodename == "236d309b3a2c.mylabserver.com"
+
+  - name: Edit listeners in kafka server properties in kafka3
+    lineinfile:
+      path: /etc/kafka/server.properties
+      regexp: '^#listeners=PLAINTEXT://:9092'
+      line: listeners=PLAINTEXT://236d309b3a3c.mylabserver.com:9092
+    when: ansible_nodename == "236d309b3a3c.mylabserver.com"
+
+  - name: Edit advertise listeners in kafka server properties in kafka1
+    lineinfile:
+      path: /etc/kafka/server.properties
+      regexp: '^#listeners=PLAINTEXT://:9092'
+      line: listeners=PLAINTEXT://236d309b3a1c.mylabserver.com:9092
+    when: ansible_nodename == "236d309b3a1c.mylabserver.com"
+
+  - name: Edit advertise listeners in kafka server properties in kafka2
+    lineinfile:
+      path: /etc/kafka/server.properties
+      regexp: '^#advertised.listeners=.+'
+      line: advertised.listeners=PLAINTEXT://236d309b3a2c.mylabserver.com:9092
+    when: ansible_nodename == "236d309b3a2c.mylabserver.com"
+
+  - name: Edit advertise listeners in kafka server properties in kafka3
+    lineinfile:
+      path: /etc/kafka/server.properties
+      regexp: '^#advertised.listeners=.+'
+      line: advertised.listeners=PLAINTEXT://236d309b3a3c.mylabserver.com:9092
+    when: ansible_nodename == "236d309b3a3c.mylabserver.com"
+
+  - name: Start confluent-zookeeper service
+    systemd:
+      name: confluent-zookeeper
+      state: started
+      enabled: yes
+
+  - name: Start confluent-kafka service
+    systemd:
+      name: confluent-kafka
+      state: started
+      enabled: yes
+
+
+        
