@@ -4,16 +4,35 @@
   become: true
   tasks:
 
-  - name: Install java-1.8.0-openjdk
+  - name: Enable epel repo
     package:
-      name: java-1.8.0-openjdk
+      name: https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
       state: present
   
-  - name: Install firewalld
-    package:
-      name: firewalld
-      state: present
+  - name: Add Confluent repository
+    yum_repository:
+      name: Confluent
+      description: Confluent Repo for Kafka
+      baseurl: https://packages.confluent.io/rpm/7.2
+      gpgcheck: yes
+      gpgkey: https://packages.confluent.io/rpm/7.2/archive.key
+      enabled: yes
 
+
+  - name: Install required software
+    package:
+      name: "{{ item }}"
+      state: present
+    loop: 
+      - java-1.8.0-openjdk
+      - freeradius-utils
+      - graphviz-gd
+      - dialog
+      - httpd
+      - httpd-tools
+      - php-mbstring
+      - firewalld
+  
   - name: Start and enable firewalld
     systemd:
       name: firewalld
@@ -34,14 +53,6 @@
 
 # https://docs.confluent.io/platform/current/installation/installing_cp/rhel-centos.html
 
-  - name: Add Confluent repository
-    yum_repository:
-      name: Confluent
-      description: Confluent Repo for Kafka
-      baseurl: https://packages.confluent.io/rpm/7.2
-      gpgcheck: yes
-      gpgkey: https://packages.confluent.io/rpm/7.2/archive.key
-      enabled: yes
 
   - name: Install Confluent Community
     package:
@@ -69,34 +80,34 @@
         autopurge.snapRetainCount=3
         autopurge.purgeInterval=24
 
-  - name: Open port 2181
+  - name: Open port 2181, 2888, 3888, 9092
     firewalld:
-      port: 2181/tcp
+      port: "{{ item }}"
       permanent: yes
       immediate: yes
       state: enabled
+    loop:
+      - 2181/tcp
+      - 2888/tcp
+      - 3888/tcp
+      - 9092/tcp
   
-  - name: Open port 2888
+  - name: Allow http traffic for checkmk
     firewalld:
-      port: 2888/tcp
+      zone: public
+      service: http
       permanent: yes
       immediate: yes
       state: enabled
-  
-  - name: Open port 3888
-    firewalld:
-      port: 3888/tcp
-      permanent: yes
-      immediate: yes
-      state: enabled
+    when: ansible_nodename == "236d309b3a1c.mylabserver.com"
 
-  - name: Open port 9092
-    firewalld:
-      port: 9092/tcp
-      permanent: yes
-      immediate: yes
-      state: enabled
-  
+  - name: Set httpd_can_network_connect flag on and keep it persistent across reboots
+    seboolean:
+      name: httpd_can_network_connect
+      state: yes
+      persistent: yes
+    when: ansible_nodename == "236d309b3a1c.mylabserver.com"
+
   - name: zookeper ID file 1
     copy:
       dest: /var/lib/zookeeper/myid
@@ -184,17 +195,25 @@
       line: advertised.listeners=PLAINTEXT://236d309b3a3c.mylabserver.com:9092
     when: ansible_nodename == "236d309b3a3c.mylabserver.com"
 
-  - name: Start confluent-zookeeper service
+
+  - name: Install checkmk
+    package:
+      name: https://download.checkmk.com/checkmk/2.1.0p9/check-mk-free-2.1.0p9-el7-38.x86_64.rpm
+      state: present
+    when: ansible_nodename == "236d309b3a1c.mylabserver.com"
+
+  - name: Start confluent-zookeeper and confluent-kafka
     systemd:
-      name: confluent-zookeeper
+      name: "{{ item }}"
       state: started
       enabled: yes
+    loop:
+      - confluent-zookeeper
+      - confluent-kafka
 
-  - name: Start confluent-kafka service
+  - name: Start checkmk service
     systemd:
-      name: confluent-kafka
+      name: omd
       state: started
       enabled: yes
-
-
-        
+    when: ansible_nodename == "236d309b3a1c.mylabserver.com"
