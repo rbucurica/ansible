@@ -4,10 +4,10 @@
   become: true
   tasks:
 
-  - name: Enable epel repo
-    package:
-      name: https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
-      state: present
+  # - name: Enable epel repo
+  #   package:
+  #     name: https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+  #     state: present
   
   - name: Add Confluent repository
     yum_repository:
@@ -25,12 +25,6 @@
       state: present
     loop: 
       - java-1.8.0-openjdk
-      - freeradius-utils
-      - graphviz-gd
-      - dialog
-      - httpd
-      - httpd-tools
-      - php-mbstring
       - firewalld
   
   - name: Start and enable firewalld
@@ -63,9 +57,9 @@
     copy:
       dest: /etc/hosts
       content: |
-        172.31.18.178 236d309b3a1c.mylabserver.com zoo1
-        172.31.27.121 236d309b3a2c.mylabserver.com zoo2
-        172.31.19.242 236d309b3a3c.mylabserver.com zoo3
+        172.31.114.202 236d309b3a1c.mylabserver.com zoo1
+        172.31.112.139 236d309b3a2c.mylabserver.com zoo2
+        172.31.112.43 236d309b3a3c.mylabserver.com zoo3
 
   - name: Edit /etc/kafka/zookeeper.properties
     blockinfile:
@@ -79,7 +73,7 @@
         server.3=zoo3:2888:3888
         autopurge.snapRetainCount=3
         autopurge.purgeInterval=24
-
+    
   - name: Open port 2181, 2888, 3888, 9092
     firewalld:
       port: "{{ item }}"
@@ -92,22 +86,6 @@
       - 3888/tcp
       - 9092/tcp
   
-  - name: Allow http traffic for checkmk
-    firewalld:
-      zone: public
-      service: http
-      permanent: yes
-      immediate: yes
-      state: enabled
-    when: ansible_nodename == "236d309b3a1c.mylabserver.com"
-
-  - name: Set httpd_can_network_connect flag on and keep it persistent across reboots
-    seboolean:
-      name: httpd_can_network_connect
-      state: yes
-      persistent: yes
-    when: ansible_nodename == "236d309b3a1c.mylabserver.com"
-
   - name: zookeper ID file 1
     copy:
       dest: /var/lib/zookeeper/myid
@@ -195,13 +173,6 @@
       line: advertised.listeners=PLAINTEXT://236d309b3a3c.mylabserver.com:9092
     when: ansible_nodename == "236d309b3a3c.mylabserver.com"
 
-
-  - name: Install checkmk
-    package:
-      name: https://download.checkmk.com/checkmk/2.1.0p9/check-mk-free-2.1.0p9-el7-38.x86_64.rpm
-      state: present
-    when: ansible_nodename == "236d309b3a1c.mylabserver.com"
-
   - name: Start confluent-zookeeper and confluent-kafka
     systemd:
       name: "{{ item }}"
@@ -211,9 +182,42 @@
       - confluent-zookeeper
       - confluent-kafka
 
+- hosts: checkmk
+  become: true
+  tasks:
+
+  - name: Install required software
+    package:
+      name: firewalld
+      state: present
+
+  - name: Start and enable firewalld
+    systemd:
+      name: firewalld
+      state: started
+      enabled: yes
+
+  - name: Install checkmk
+    package:
+      name: https://download.checkmk.com/checkmk/2.1.0p9/check-mk-free-2.1.0p9-el7-38.x86_64.rpm
+      state: present
+
   - name: Start checkmk service
     systemd:
       name: omd
       state: started
       enabled: yes
-    when: ansible_nodename == "236d309b3a1c.mylabserver.com"
+
+  - name: Allow http traffic for checkmk
+    firewalld:
+      zone: public
+      service: http
+      permanent: yes
+      immediate: yes
+      state: enabled
+
+  - name: Set httpd_can_network_connect flag on and keep it persistent across reboots
+    seboolean:
+      name: httpd_can_network_connect
+      state: yes
+      persistent: yes
